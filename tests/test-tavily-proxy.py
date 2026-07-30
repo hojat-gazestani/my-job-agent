@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
+
 import requests
+from dotenv import load_dotenv
 from tavily import TavilyClient
 
 load_dotenv()

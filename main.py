@@ -1,7 +1,7 @@
 from typing import List
 
-from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 load_dotenv()
 from langchain.agents import create_agent

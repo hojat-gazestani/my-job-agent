@@ -1,13 +1,15 @@
-import os
 import json
-from tavily import TavilyClient
-from langchain_core.tools import tool
+import os
+
 from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+from tavily import TavilyClient
 
 # Initialize Tavily
 tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+
 
 @tool
 def search(query: str) -> str:
@@ -21,6 +23,7 @@ def search(query: str) -> str:
     print(f"Searching for: {query}")
     results = tavily.search(query=query, max_results=5, search_depth="advanced")
     return json.dumps(results)
+
 
 # Initialize vLLM / OpenAI client
 llm = ChatOpenAI(
@@ -38,16 +41,17 @@ system_prompt = (
 tools = [search]
 agent = create_react_agent(model=llm, tools=tools, state_modifier=system_prompt)
 
+
 def main():
     print("Job agent starting search...")
-    
+
     # Pass concrete skills so the LLM can score fit
     candidate_profile = """
     Skills: Kubernetes, Terraform, AWS/GCP, CI/CD, Python, Prometheus, Docker.
     Experience: 4 years in SRE / Infrastructure Engineering.
     Language: Professional English.
     """
-    
+
     query = f"""
     Search for open SRE and DevOps positions in Europe posted in the last 7 days.
     
@@ -59,13 +63,12 @@ def main():
     
     Format output with: Job Title, Company, Location, Visa Status, and Direct Link.
     """
-    
-    result = agent.invoke({
-        "messages": [HumanMessage(content=query)]
-    })
-    
+
+    result = agent.invoke({"messages": [HumanMessage(content=query)]})
+
     # Print final agent answer
     print(result["messages"][-1].content)
+
 
 if __name__ == "__main__":
     main()
