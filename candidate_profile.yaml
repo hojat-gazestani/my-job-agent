@@ -1,0 +1,74 @@
+name: Hojat Gazestani
+
+title:
+  - Senior Platform Engineer
+  - Senior Site Reliability Engineer
+  - AI Infrastructure Engineer
+
+experience: 10+
+
+preferred_locations:
+  - Europe
+  - Remote
+
+work_authorization:
+  visa_sponsorship_required: true
+
+roles:
+  - Platform Engineer
+  - Site Reliability Engineer
+  - DevOps Engineer
+  - Cloud Engineer
+  - AI Infrastructure Engineer
+  - Agent Engineer
+  - Developer Productivity Engineer
+
+skills:
+  infrastructure:
+    - Kubernetes
+    - AWS
+    - OpenStack
+    - Terraform
+    - Docker
+    - Linux
+
+  devops:
+    - GitLab CI
+    - FluxCD
+    - Kustomize
+    - Prometheus
+    - Grafana
+    - VictoriaMetrics
+    - Elasticsearch
+
+  programming:
+    - Python
+    - Django
+    - REST APIs
+    - Bash
+
+  ai:
+    - LangChain
+    - LangGraph
+    - RAG
+    - MCP
+    - Tool Calling
+    - vLLM
+    - AI Agents
+
+projects:
+  - AI-powered RCA platform
+  - Kubernetes AI assistant
+  - Gerrit-Jira workflow automation
+  - AWS platform engineering
+  - GitOps platforms
+
+languages:
+  - English
+  - German (basic)
+  - Persian
+
+exclude:
+  - Senior Manager
+  - Sales
+  - Frontend
