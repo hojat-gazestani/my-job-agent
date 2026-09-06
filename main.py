@@ -10,7 +10,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
+from rich.console import Console
+from rich.markdown import Markdown
 from tavily import TavilyClient
+
+from models.models import JobReport
 
 load_dotenv()
 VLLM_KEY = os.getenv("OPENAI_API_KEY")
@@ -70,6 +74,43 @@ class GeneratedQueries(BaseModel):
     queries: list[str] = Field(
         description="List of targeted queries derived from candidate profile."
     )
+
+
+def render_markdown(report: JobReport) -> str:
+    lines = [
+        "# Job Matching Evaluation Report",
+        "",
+        "## Top matches",
+        "",
+        "| Job Title | Company | Location | Fit score | Visa Status | Link |",
+        "|---|---|---|---|---|---|",
+    ]
+
+    for job in sorted(report.jobs, key=lambda x: x.fit_score, reverse=True):
+        lines.append(
+            f"| {job.title} | {job.company} | {job.location} | "
+            f"{job.fit_score}% | {job.visa_status} |"
+            f"[View Job]({job.url}) |"
+        )
+
+    lines.extend(["", "## Detailed Breakdown", ""])
+
+    for i, job in enumerate(
+        sorted(report.jobs, key=lambda x: x.fit_score, reverse=True),
+        1,
+    ):
+        lines.extend(
+            [
+                f"### {i}. {job.title}",
+                f"- **Company:** {job.company}",
+                f"- **Location:** {job.location}",
+                f"- **Fit Score:** {job.fit_score}",
+                f"- **Visa Status:** {job.visa_status}",
+                f"- **Reason:** {job.reason}",
+                "",
+            ]
+        )
+    return "\n".join(lines)
 
 
 # Node 1: PLanner Agent
@@ -176,50 +217,53 @@ def verifier_node(state: AgentState) -> dict[str, Any]:
 def scorer_node(state: AgentState) -> dict[str, Any]:
     print("\n[Scoring Agent] Evaluating candidate profile fit against verified listings...")
 
-    jobs_summary = []
-    for j in state["verified_jobs"]:
-        jobs_summary.append(
-            {
-                "title": j.get("title"),
-                "url": j.get("url"),
-                "snippet": j.get("content"),
-                "extracted_text": j.get("page_content", "")[:1000],
-            }
-        )
-
+    jobs_summary = [
+        {
+            "title": job.get("title"),
+            "url": job.get("url"),
+            "snippet": job.get("content"),
+            "extracted_text": job.get("page_content", "")[:1000],
+        }
+        for job in state["verified_jobs"]
+    ]
     prompt = f"""
 
     Candidate Profile:
     {json.dumps(candidate_profile, indent=2)}
 
-    Score each of the verified jobs below based on profile overlap.
+    Evaluate each verified job against this candidate.
 
-    Evaluation Criteria:
+    Evaluation criteria:
     - Target >= 70% skill overlap.
-    - Reject if English is not the primary language.
+    - Reject if English is not the primary working language.
     - Reject if visa sponsorship is explicitly denied or restricted to local citizens.
-    - Factor in match quality against preferred job titles and primary skills.
+    - Consider preferred job titles.
+    - Consider primary technical skills.
+    - Do not assume facts that are not present in the job listing.
+    - If visa sponsorship is unclear, explicitly mark it as "Unknown".
+    - Do not infer sponsorship merely because a role is remote.
 
-    Verified Jobs to Score:
+    Verified Jobs :
     {json.dumps(jobs_summary, indent=2)}
 
     Output Requirement:
-    Return a cleanly formatted Markdown report containing:
-    1. A summary table of top-matching roles (Job Title, Company, Location,
-       Fit Score %, Visa Status, Direct Link).
-    2. A brief breakdown explaining why each role was chosen or rejected
-       based on profile match.
+    - Assign fit_score as a percentage (0-100) based on skill overlap.
+    - Be thorough and specific in the reason field.
+    - Only include jobs that pass the evaluation criteria.
     """
 
-    response = llm.invoke(
+    scorer_llm = llm.with_structured_output(JobReport)
+
+    report = scorer_llm.invoke(
         [
             SystemMessage(
-                content="You are an AI Career Agent evaluating job opportunities for a candidate."
+                content="You are an AI Career Agent evaluating job opportunities "
+                "for a candidate profile."
             ),
             HumanMessage(content=prompt),
         ]
     )
-    return {"final_report": response.content}
+    return {"final_report": render_markdown(report)}
 
 
 # Langgraph Pipeline
@@ -246,12 +290,11 @@ def main():
         "verified_jobs": [],
         "final_report": "",
     }
+    console = Console()
 
     output = graph.invoke(initial_state)
-    print("\n" + "=" * 50)
     print("FINAL JOB SEARCH REPORT")
-    print("=" * 50 + "\n")
-    print(output["final_report"])
+    console.print(Markdown(output["final_report"]))
 
 
 if __name__ == "__main__":

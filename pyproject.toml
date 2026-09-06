@@ -16,6 +16,7 @@ dependencies = [
     "httpx[socks]>=0.28.1",
     "pre-commit>=4.1.0",
     "ruff>=0.9.0",
+    "rich>=15.0.0",
 ]
 
 [tool.ruff]
