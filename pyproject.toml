@@ -13,4 +13,6 @@ dependencies = [
     "requests[socks]>=2.34.2",
     "python-dotenv>=1.2.2",
     "tavily>=1.1.0",
+    "tavily-python>=0.8.1",
+    "httpx[socks]>=0.28.1",
 ]

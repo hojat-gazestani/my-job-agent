@@ -11,6 +11,7 @@ load_dotenv()
 VLLM_KEY = os.getenv("OPENAI_API_KEY")
 VLLM_HOST = os.getenv("VLLM_HOST")
 VLLM_PORT = os.getenv("VLLM_PORT")
+VLLM_MODEL = os.getenv("VLLM_MODEL")
 
 existing_no_proxy = os.environ.get("NO_PROXY", "")
 os.environ["NO_PROXY"] = f"{VLLM_HOST},{existing_no_proxy}".strip(",")
@@ -37,7 +38,7 @@ tavily = TavilyClient(
 )
 
 llm = ChatOpenAI(
-    model="Google/Gemma-4-31B-it",
+    model=VLLM_MODEL,
     base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1",
     api_key=VLLM_KEY,
 )
@@ -76,7 +77,6 @@ def planner_node(state: AgentState) -> Dict[str, Any]:
     planner_llm = llm.with_structured_output(GeneratedQueries)
 
     prompt = f"""
-    You are an expert Executive Tech Recruiter.
     Analyze this candidate profile:
     {json.dumps(CANDIDATE_PROFILE, indent=2)}
 
@@ -87,7 +87,12 @@ def planner_node(state: AgentState) -> Dict[str, Any]:
     - Target diverse roles that match their experience (e.g., Platform, SRE, Developer Productivity, Infrastructure).
     """
 
-    res = planner_llm.invoke([SystemMessage(content=prompt)])
+    res = planner_llm.invoke([
+        SystemMessage(
+            content="You are an expert Executive Tech Recruiter."
+        ),
+        HumanMessage(content=prompt),
+    ])
     print(f"Generated {len(res.queries)} targeted queries.")
     return {"queries": res.queries}
 
@@ -170,7 +175,6 @@ def scorer_node(state: AgentState) -> Dict[str, Any]:
         )
 
     prompt = f"""
-    You are an AI Career Agent evaluating job opportunities for a candidate.
 
     Candidate Profile:
     Score each of the verified jobs below based on profile overlap.
@@ -190,7 +194,12 @@ def scorer_node(state: AgentState) -> Dict[str, Any]:
     2. A brief breakdwon explaining why each role was chosen or rejected based on profile match.
     """
 
-    response = llm.invoke([SystemMessage(content=prompt)])
+    response = llm.invoke([
+        SystemMessage(
+            content="You are an AI Career Agent evaluating job opportunities for a candidate."
+        ),
+        HumanMessage(content=prompt),
+    ])
     return {"final_report": response.content}
 
 

@@ -1,4 +1,4 @@
-from typing import List
+from typing import list
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -21,7 +21,7 @@ class AgentResponse(BaseModel):
     """Schema for agent response with answer and sources"""
 
     answer: str = Field(description="Thr agent's answer to the query")
-    sources: List[Source] = Field(
+    sources: list[Source] = Field(
         default_factory=list, description="List of sources used to generate the answer"
     )
 
