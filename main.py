@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from typing import Any, TypedDict
 
 import requests
@@ -39,13 +40,20 @@ llm = ChatOpenAI(
 
 
 # Load Candidate profile
-with open("candidate_profile.yaml") as f:
-    CANDIDATE_PROFILE = yaml.safe_load(f)
+PROFILE_PATH = Path(__file__).parent / "candidate_profile.yaml"
+if not PROFILE_PATH.exists():
+    raise FileNotFoundError(f"Profile not found: {PROFILE_PATH}")
+
+with PROFILE_PATH.open("r", encoding="utf-8") as f:
+    candidate_profile = yaml.safe_load(f)
+
+if not isinstance(candidate_profile, dict):
+    raise ValueError(f"Invalid candidate profile: {PROFILE_PATH}")
 
 
 class AgentState(TypedDict):
     """
-    Lnaggraph shared state
+    Langgraph shared state
     """
 
     queries: list[str]
@@ -60,7 +68,7 @@ class GeneratedQueries(BaseModel):
     """
 
     queries: list[str] = Field(
-        description="List of targeted queries derived from candidated profile."
+        description="List of targeted queries derived from candidate profile."
     )
 
 
@@ -72,7 +80,7 @@ def planner_node(state: AgentState) -> dict[str, Any]:
 
     prompt = f"""
     Analyze this candidate profile:
-    {json.dumps(CANDIDATE_PROFILE, indent=2)}
+    {json.dumps(candidate_profile, indent=2)}
 
     Generate 6 targeted search queries to find current job listings in Europe
     with visa sponsorship. Derive specific keyword combinations using ATS
@@ -95,12 +103,12 @@ def planner_node(state: AgentState) -> dict[str, Any]:
 
 # Node 2: Search Tool Executor
 def search_node(state: AgentState) -> dict[str, Any]:
-    print("\n[Search Tool] Executing Tavily searchs...")
+    print("\n[Search Tool] Executing Tavily searches...")
     raw_results = []
     seen_urls = set()
 
     for query_text in state["queries"]:
-        print(f" Searching : {query_text}")
+        print(f" Searching: {query_text}")
         try:
             res = tavily.search(query=query_text, max_results=15, search_depth="advanced")
             for item in res.get("results", []):
@@ -117,8 +125,15 @@ def search_node(state: AgentState) -> dict[str, Any]:
 
 # Node 3: Verification Agent
 def verifier_node(state: AgentState) -> dict[str, Any]:
-    print("\n[Verfier Tool] Checking URLs for expiration and active listings...")
+    print("\n[Verifier Tool] Checking URLs for expiration and active listings...")
     verified = []
+    expired_count = 0
+    closed_phrases = [
+        "job closed",
+        "no longer accepting applications",
+        "position filled",
+        "expired",
+    ]
 
     candidates_url = state["raw_results"][:12]
 
@@ -126,34 +141,40 @@ def verifier_node(state: AgentState) -> dict[str, Any]:
         url = item["url"]
         try:
             ext = tavily.extract(urls=[url])
+            if not isinstance(ext, dict):
+                continue
+
             results = ext.get("results", [])
-            if results:
-                raw_text = results[0].get("raw_content", "").lower()
-                # Exclude expired or closed jobs
-                if any(
-                    phrase in raw_text
-                    for phrase in [
-                        "job closed",
-                        "no longer accepting applications",
-                        "position filled",
-                        "expired",
-                    ]
-                ):
-                    print(f" [X] Expired/Closed: {url}")
-                    continue
+            if not isinstance(results, list) or not results:
+                print(f" [!] No content: {url}")
+                continue
 
-                item["page_content"] = raw_text[:2000]  # Pass context snippet to scorer
-                verified.append(item)
-                print(f" [✓] Active: {url}")
+            first_result = results[0]
+            if not isinstance(first_result, dict):
+                continue
+
+            raw_text = (results[0].get("raw_content") or "").lower()
+
+            # Exclude expired or closed jobs
+            if any(phrase in raw_text for phrase in closed_phrases):
+                expired_count += 1
+                continue
+
+            item["page_content"] = raw_text[:2000]  # Pass context snippet to scorer
+            verified.append(item)
+
+            print(f" [✓] Active: {url}")
+
         except Exception as e:
-            print(f" [!] Failed verification for {url}: {e}")
+            print(f" [!] Failed verification for {url} {type(e).__name__}: {e}")
 
+    print(f"[Verifier] {len(verified)} active, {expired_count} expired/closed")
     return {"verified_jobs": verified}
 
 
 # Node 4: Job Scoring & Report Agent
 def scorer_node(state: AgentState) -> dict[str, Any]:
-    print("\n[Scoring Agent] Evaluating condidate profile fit against verfied listings...")
+    print("\n[Scoring Agent] Evaluating candidate profile fit against verified listings...")
 
     jobs_summary = []
     for j in state["verified_jobs"]:
@@ -169,6 +190,8 @@ def scorer_node(state: AgentState) -> dict[str, Any]:
     prompt = f"""
 
     Candidate Profile:
+    {json.dumps(candidate_profile, indent=2)}
+
     Score each of the verified jobs below based on profile overlap.
 
     Evaluation Criteria:
