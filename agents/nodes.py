@@ -3,12 +3,12 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from cli.display import render_markdown
 from config.clients import llm, tavily
 from config.profile import get_profile
 from models.models import JobReport
 
-from .state import AgentState, GeneratedQueries
+from .schemas import GeneratedQueries
+from .state import AgentState
 
 candidate_profile = get_profile()
 
@@ -163,4 +163,4 @@ def scorer_node(state: AgentState) -> dict[str, Any]:
             HumanMessage(content=prompt),
         ]
     )
-    return {"final_report": render_markdown(report)}
+    return {"final_report": report}
