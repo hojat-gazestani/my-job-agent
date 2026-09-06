@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI
 
-llm = ChatOpenAI(model="Google/Gemma-4-31B-it")
+llm = ChatOpenAI(model="AliBaba/Qwen3.6-27B")
 
 print(llm.invoke("Hello"))
