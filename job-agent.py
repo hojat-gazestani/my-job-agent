@@ -1,11 +1,15 @@
 import json
 import os
-from typing import Any, Dict, List, TypedDict
+from typing import Any, TypedDict
 
 import requests
 import yaml
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
+from tavily import TavilyClient
 
 load_dotenv()
 VLLM_KEY = os.getenv("OPENAI_API_KEY")
@@ -15,16 +19,6 @@ VLLM_MODEL = os.getenv("VLLM_MODEL")
 
 existing_no_proxy = os.environ.get("NO_PROXY", "")
 os.environ["NO_PROXY"] = f"{VLLM_HOST},{existing_no_proxy}".strip(",")
-
-import httpx
-from langchain.agents import create_agent
-from langchain.tools import tool
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-from langchain_tavily import TavilySearch
-from langgraph.prebuilt import create_react_agent
-from langgraph.graph import StateGraph, START, END
-from tavily import TavilyClient
 
 PROXY = os.getenv("HTTPS_PROXY")
 
@@ -45,7 +39,7 @@ llm = ChatOpenAI(
 
 
 # Load Candidate profile
-with open("candidate_profile.yaml", "r") as f:
+with open("candidate_profile.yaml") as f:
     CANDIDATE_PROFILE = yaml.safe_load(f)
 
 
@@ -54,9 +48,9 @@ class AgentState(TypedDict):
     Lnaggraph shared state
     """
 
-    queries: List[str]
-    raw_results: List[Dict[str, Any]]
-    verified_jobs: List[Dict[str, Any]]
+    queries: list[str]
+    raw_results: list[dict[str, Any]]
+    verified_jobs: list[dict[str, Any]]
     final_report: str
 
 
@@ -65,13 +59,13 @@ class GeneratedQueries(BaseModel):
     Pydantic Schema for Planner
     """
 
-    queries: List[str] = Field(
+    queries: list[str] = Field(
         description="List of targeted queries derived from candidated profile."
     )
 
 
 # Node 1: PLanner Agent
-def planner_node(state: AgentState) -> Dict[str, Any]:
+def planner_node(state: AgentState) -> dict[str, Any]:
     print("\n[Planner Agent] Generating search queries from candidate profile ...")
 
     planner_llm = llm.with_structured_output(GeneratedQueries)
@@ -80,25 +74,27 @@ def planner_node(state: AgentState) -> Dict[str, Any]:
     Analyze this candidate profile:
     {json.dumps(CANDIDATE_PROFILE, indent=2)}
 
-    Generate 6 targeted search queries to find current job listings in Europe with visa sponsorship.
-    Derive specific keyword combinations (e.g., using ATS domains like site:greenhouse.io or site:lever.co combined with specific stack variants).
+    Generate 6 targeted search queries to find current job listings in Europe
+    with visa sponsorship. Derive specific keyword combinations using ATS
+    domains like site:greenhouse.io or site:lever.co combined with stack variants.
 
     Rules:
-    - Target diverse roles that match their experience (e.g., Platform, SRE, Developer Productivity, Infrastructure).
+    - Target diverse roles that match their experience (e.g., Platform, SRE,
+      Developer Productivity, Infrastructure).
     """
 
-    res = planner_llm.invoke([
-        SystemMessage(
-            content="You are an expert Executive Tech Recruiter."
-        ),
-        HumanMessage(content=prompt),
-    ])
+    res = planner_llm.invoke(
+        [
+            SystemMessage(content="You are an expert Executive Tech Recruiter."),
+            HumanMessage(content=prompt),
+        ]
+    )
     print(f"Generated {len(res.queries)} targeted queries.")
     return {"queries": res.queries}
 
 
 # Node 2: Search Tool Executor
-def search_node(state: AgentState) -> Dict[str, Any]:
+def search_node(state: AgentState) -> dict[str, Any]:
     print("\n[Search Tool] Executing Tavily searchs...")
     raw_results = []
     seen_urls = set()
@@ -106,9 +102,7 @@ def search_node(state: AgentState) -> Dict[str, Any]:
     for query_text in state["queries"]:
         print(f" Searching : {query_text}")
         try:
-            res = tavily.search(
-                query=query_text, max_results=15, search_depth="advanced"
-            )
+            res = tavily.search(query=query_text, max_results=15, search_depth="advanced")
             for item in res.get("results", []):
                 url = item.get("url")
                 if url and url not in seen_urls:
@@ -122,7 +116,7 @@ def search_node(state: AgentState) -> Dict[str, Any]:
 
 
 # Node 3: Verification Agent
-def verifier_node(state: AgentState) -> Dict[str, Any]:
+def verifier_node(state: AgentState) -> dict[str, Any]:
     print("\n[Verfier Tool] Checking URLs for expiration and active listings...")
     verified = []
 
@@ -158,10 +152,8 @@ def verifier_node(state: AgentState) -> Dict[str, Any]:
 
 
 # Node 4: Job Scoring & Report Agent
-def scorer_node(state: AgentState) -> Dict[str, Any]:
-    print(
-        "\n[Scoring Agent] Evaluating condidate profile fit against verfied listings..."
-    )
+def scorer_node(state: AgentState) -> dict[str, Any]:
+    print("\n[Scoring Agent] Evaluating condidate profile fit against verfied listings...")
 
     jobs_summary = []
     for j in state["verified_jobs"]:
@@ -190,16 +182,20 @@ def scorer_node(state: AgentState) -> Dict[str, Any]:
 
     Output Requirement:
     Return a cleanly formatted Markdown report containing:
-    1. A summary table of top-matching roles (Job Title, Company, Location, Fit Score %, Visa Status, Direct Link).
-    2. A brief breakdwon explaining why each role was chosen or rejected based on profile match.
+    1. A summary table of top-matching roles (Job Title, Company, Location,
+       Fit Score %, Visa Status, Direct Link).
+    2. A brief breakdown explaining why each role was chosen or rejected
+       based on profile match.
     """
 
-    response = llm.invoke([
-        SystemMessage(
-            content="You are an AI Career Agent evaluating job opportunities for a candidate."
-        ),
-        HumanMessage(content=prompt),
-    ])
+    response = llm.invoke(
+        [
+            SystemMessage(
+                content="You are an AI Career Agent evaluating job opportunities for a candidate."
+            ),
+            HumanMessage(content=prompt),
+        ]
+    )
     return {"final_report": response.content}
 
 

@@ -1,11 +1,18 @@
 import json
 import os
 
+from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from tavily import TavilyClient
+
+load_dotenv()
+VLLM_KEY = os.getenv("OPENAI_API_KEY")
+VLLM_HOST = os.getenv("VLLM_HOST")
+VLLM_PORT = os.getenv("VLLM_PORT")
+VLLM_MODEL = os.getenv("VLLM_MODEL")
 
 # Initialize Tavily
 tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
@@ -34,8 +41,10 @@ llm = ChatOpenAI(
 
 system_prompt = (
     "You are an expert AI Career Assistant. "
-    "When searching for jobs, convert complex user criteria into short, high-intent keyword queries. "
-    "Filter out expired postings and match job criteria against the provided candidate profile."
+    "When searching for jobs, convert complex user criteria into short, "
+    "high-intent keyword queries. "
+    "Filter out expired postings and match job criteria against "
+    "the provided candidate profile."
 )
 
 tools = [search]
@@ -54,13 +63,13 @@ def main():
 
     query = f"""
     Search for open SRE and DevOps positions in Europe posted in the last 7 days.
-    
+
     Constraints:
     - English-speaking role with visa sponsorship available.
     - Position must still be actively accepting applications.
     - Match against candidate profile:
     {candidate_profile}
-    
+
     Format output with: Job Title, Company, Location, Visa Status, and Direct Link.
     """
 

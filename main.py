@@ -1,14 +1,13 @@
 from typing import list
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-
-load_dotenv()
 from langchain.agents import create_agent
-from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_tavily import TavilySearch
+from pydantic import BaseModel, Field
+
+load_dotenv()
 
 
 class Source(BaseModel):
@@ -36,7 +35,10 @@ def main():
     result = agent.invoke(
         {
             "messages": HumanMessage(
-                content="search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details?"
+                content=(
+                    "search for 3 job postings for an ai engineer using langchain "
+                    "in the bay area on linkedin and list their details?"
+                )
             )
         }
     )
