@@ -1,0 +1,40 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "type": "search_session",
+      "query_summary": "Job search",
+      "id": "session:d0e56dc4"
+    },
+    {
+      "type": "applied_job",
+      "title": "Staff Platform Engineer, Infrastructure - Core UK & Ireland at Fanatics Betting & Gaming",
+      "company": "Fanatics Betting & Gaming",
+      "location": "UK & Ireland",
+      "applied_date": "50f0c860",
+      "id": "https://job-boards.greenhouse.io/fanaticsfbg/jobs/4218898009"
+    },
+    {
+      "type": "applied_job",
+      "title": "Senior Platform Engineer, Infrastructure at Webflow",
+      "company": "Webflow",
+      "location": "Remote (Global Zones)",
+      "applied_date": "a18a27a4",
+      "id": "https://job-boards.greenhouse.io/webflow/jobs/8148362"
+    }
+  ],
+  "edges": [
+    {
+      "label": "applied",
+      "source": "session:d0e56dc4",
+      "target": "https://job-boards.greenhouse.io/fanaticsfbg/jobs/4218898009"
+    },
+    {
+      "label": "applied",
+      "source": "session:d0e56dc4",
+      "target": "https://job-boards.greenhouse.io/webflow/jobs/8148362"
+    }
+  ]
+}
